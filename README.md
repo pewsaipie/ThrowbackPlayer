@@ -36,7 +36,7 @@ Nothing is uploaded. User files never leave the browser.
 
 Vite + TypeScript + CSS + Canvas + Web Audio. No React.
 
-GitHub Pages deploys from this branch via Actions.
+GitHub Pages deploys from `main` via Actions. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
 
 ## License
 
