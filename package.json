@@ -1,0 +1,22 @@
+{
+  "name": "throwback-player",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Throwback Player — a pocket studio cassette deck that plays your files.",
+  "homepage": "https://pewsaipie.github.io/ThrowbackPlayer/",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5173"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.2.5",
+    "@fontsource/caveat": "^5.2.5",
+    "@fontsource/share-tech-mono": "^5.2.5"
+  }
+}

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="description" content="Throwback Player — a pocket studio cassette deck that plays your files." />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <link rel="icon" href="%BASE_URL%icon.svg" type="image/svg+xml" />
+    <title>Throwback Player</title>
+  </head>
+  <body>
+    <div class="desk">
+      <div class="phone" id="phone">
+        <div class="deck" id="deck" data-light="on">
+          <header class="grill" aria-hidden="true">
+            <div class="slats"></div>
+            <span class="model">SB-D6 FIELD</span>
+          </header>
+
+          <div class="well" id="door" role="button" tabindex="0" aria-label="Open cassette tray">
+            <div class="cassette" id="cassette">
+              <div class="label-tape">
+                <input
+                  class="label"
+                  id="label"
+                  maxlength="28"
+                  spellcheck="false"
+                  aria-label="Tape label"
+                  value="Threading tape…"
+                />
+              </div>
+              <canvas id="reels" class="reels"></canvas>
+              <span class="side-badge" id="sideBadge" role="button" tabindex="0" title="Flip side">A</span>
+            </div>
+          </div>
+
+          <section class="vu-row">
+            <div class="switch-col">
+              <span class="cap">LIGHT</span>
+              <button class="toggle" id="light" type="button" aria-pressed="true" aria-label="Meter light">
+                <span class="lever"></span>
+              </button>
+            </div>
+            <div class="vu-stack">
+              <canvas id="vuL" class="vu" aria-hidden="true"></canvas>
+              <span class="cap">LEFT</span>
+            </div>
+            <div class="vu-stack">
+              <canvas id="vuR" class="vu" aria-hidden="true"></canvas>
+              <span class="cap">RIGHT</span>
+            </div>
+            <div class="led-col">
+              <span class="cap">BATTERY</span>
+              <button class="chk" id="battery" type="button" aria-label="Battery check">CHECK</button>
+              <span class="cap">REC</span>
+              <span class="led" id="recLed"></span>
+            </div>
+          </section>
+
+          <section class="switch-row">
+            <div class="switch-col">
+              <span class="cap">DOLBY NR</span>
+              <button class="toggle" id="dolby" type="button" aria-pressed="false" aria-label="Dolby noise reduction">
+                <span class="lever"></span>
+              </button>
+              <span class="cap tiny"><span>ON</span><span>OFF</span></span>
+            </div>
+            <div class="switch-col">
+              <span class="cap">TAPE</span>
+              <button class="knob" id="tapeType" type="button" data-pos="0" aria-label="Tape type">
+                <span class="pointer"></span>
+              </button>
+              <span class="cap tiny knob-legend">NORMAL · CrO<sub>2</sub> · METAL</span>
+            </div>
+            <div class="switch-col">
+              <span class="cap">LIMITER</span>
+              <button class="toggle" id="limiter" type="button" aria-pressed="false" aria-label="Limiter">
+                <span class="lever"></span>
+              </button>
+              <span class="cap tiny"><span>ON</span><span>OFF</span></span>
+            </div>
+            <div class="switch-col">
+              <span class="cap">QUARTZ LOCK</span>
+              <button class="toggle on" id="quartz" type="button" aria-pressed="true" aria-label="Quartz lock">
+                <span class="lever"></span>
+              </button>
+              <span class="cap tiny"><span>ON</span><span>OFF</span></span>
+            </div>
+          </section>
+
+          <section class="counter-row">
+            <div class="counter-wrap">
+              <span class="cap">TAPE COUNTER</span>
+              <div class="counter" id="counter" aria-hidden="true">
+                <span>0</span><span>0</span><span>0</span><span>0</span>
+              </div>
+            </div>
+            <div class="switch-col">
+              <span class="cap">MEMORY</span>
+              <button class="toggle" id="memory" type="button" aria-pressed="false" aria-label="Memory stop">
+                <span class="lever"></span>
+              </button>
+              <span class="cap tiny"><span>ON</span><span>OFF</span></span>
+            </div>
+          </section>
+
+          <section class="keys" aria-label="Transport">
+            <div class="rec-unit">
+              <button class="rec-cover" id="recCover" type="button" aria-label="Open record cover"></button>
+              <button class="key rec" id="rec" type="button" disabled aria-label="Record">
+                <span class="face">REC</span>
+                <span class="ridges"></span>
+              </button>
+            </div>
+            <button class="key" id="play" type="button" aria-label="Play">
+              <span class="face">▶<small>PLAY</small></span>
+              <span class="ridges"></span>
+            </button>
+            <button class="key" id="pause" type="button" aria-label="Pause">
+              <span class="face">❚❚<small>PAUSE</small></span>
+              <span class="ridges"></span>
+            </button>
+            <button class="key" id="stop" type="button" aria-label="Stop">
+              <span class="face">■<small>STOP</small></span>
+              <span class="ridges"></span>
+            </button>
+            <button class="key" id="rew" type="button" aria-label="Rewind">
+              <span class="face">◀◀<small>REW</small></span>
+              <span class="ridges"></span>
+            </button>
+            <button class="key" id="ff" type="button" aria-label="Fast forward">
+              <span class="face">▶▶<small>FF</small></span>
+              <span class="ridges"></span>
+            </button>
+          </section>
+
+          <footer class="mic-row">
+            <div class="speaker-slats"></div>
+            <div class="mics">
+              <span>MIC L</span>
+              <span class="xlr"></span>
+              <span>R</span>
+              <span class="xlr"></span>
+            </div>
+          </footer>
+
+          <div class="sr-only" id="live" aria-live="polite"></div>
+        </div>
+
+        <aside class="tray" id="tray" hidden>
+          <div class="tray-inner">
+            <header>
+              <p>Cassette tray</p>
+              <button type="button" id="closeTray">Close lid</button>
+            </header>
+            <ul id="tapeList"></ul>
+            <label class="insert">
+              Insert your own
+              <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.webm" />
+            </label>
+            <p class="hint">Files stay on this device. Nothing is uploaded.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
