@@ -23,7 +23,7 @@ Open the local preview on a phone or desktop. The app can be added to a phone's 
 - Use **Export ZIP** for a cassette backup. Restore a backup by importing its ZIP from the tray.
 - Tap **REW** or **FF** to skip tracks; press and hold to wind. Drag the position slider to seek and use the volume slider to set output level.
 - Turn **Memory Stop** on to save the current position. Playback or winding stops when it crosses that mark. The marker resets when you insert a different cassette or flip sides.
-- Open the tray and choose **Check for app updates**. If an update is ready, choose **Update** to apply it and reload the app; choose **Later** to postpone.
+- Open the tray and choose **Check for app updates**. If an update is ready, choose **Update** to apply it and reload the app; choose **Later** to postpone. After this update-control release, close and reopen an older installed copy once to load the new controls.
 
 ## Features
 
