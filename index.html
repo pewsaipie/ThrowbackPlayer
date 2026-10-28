@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1a1a1a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="description" content="Throwback Player — a pocket studio cassette deck that plays your files." />
+    <meta name="description" content="A pocket cassette deck for locally playing, recording, and organizing audio." />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <link rel="icon" href="%BASE_URL%icon.svg" type="image/svg+xml" />
     <title>Throwback Player</title>
@@ -17,7 +17,7 @@
         <div class="deck" id="deck" data-light="on">
           <header class="grill" aria-hidden="true">
             <div class="slats"></div>
-            <span class="model">SB-D6 FIELD</span>
+            <span class="model">FIELD DECK</span>
           </header>
 
           <div class="well" id="door" role="button" tabindex="0" aria-label="Open cassette tray">
@@ -29,11 +29,11 @@
                   maxlength="28"
                   spellcheck="false"
                   aria-label="Tape label"
-                  value="Threading tape…"
+                  value="Winding tape…"
                 />
               </div>
               <canvas id="reels" class="reels"></canvas>
-              <span class="side-badge" id="sideBadge" role="button" tabindex="0" title="Flip side">A</span>
+              <button class="side-badge" id="sideBadge" type="button" title="Flip side">A</button>
             </div>
           </div>
 
@@ -53,8 +53,8 @@
               <span class="cap">RIGHT</span>
             </div>
             <div class="led-col">
-              <span class="cap">BATTERY</span>
-              <button class="chk" id="battery" type="button" aria-label="Battery check">CHECK</button>
+              <span class="cap">LOCAL STORE</span>
+              <button class="chk" id="storageCheck" type="button" aria-label="Check local storage usage">CHECK</button>
               <span class="cap">REC</span>
               <span class="led" id="recLed"></span>
             </div>
@@ -62,18 +62,18 @@
 
           <section class="switch-row">
             <div class="switch-col">
-              <span class="cap">DOLBY NR</span>
-              <button class="toggle" id="dolby" type="button" aria-pressed="false" aria-label="Dolby noise reduction">
+              <span class="cap">HISS REDUCTION</span>
+              <button class="toggle" id="hissReduction" type="button" aria-pressed="false" aria-label="Tape hiss reduction">
                 <span class="lever"></span>
               </button>
               <span class="cap tiny"><span>ON</span><span>OFF</span></span>
             </div>
             <div class="switch-col">
-              <span class="cap">TAPE</span>
+              <span class="cap">TAPE TYPE</span>
               <button class="knob" id="tapeType" type="button" data-pos="0" aria-label="Tape type">
                 <span class="pointer"></span>
               </button>
-              <span class="cap tiny knob-legend">NORMAL · CrO<sub>2</sub> · METAL</span>
+              <span class="cap tiny knob-legend">NORMAL · TYPE II · METAL</span>
             </div>
             <div class="switch-col">
               <span class="cap">LIMITER</span>
@@ -83,8 +83,8 @@
               <span class="cap tiny"><span>ON</span><span>OFF</span></span>
             </div>
             <div class="switch-col">
-              <span class="cap">QUARTZ LOCK</span>
-              <button class="toggle on" id="quartz" type="button" aria-pressed="true" aria-label="Quartz lock">
+              <span class="cap">SPEED STABILITY</span>
+              <button class="toggle on" id="speedStability" type="button" aria-pressed="true" aria-label="Speed stability">
                 <span class="lever"></span>
               </button>
               <span class="cap tiny"><span>ON</span><span>OFF</span></span>
@@ -99,7 +99,7 @@
               </div>
             </div>
             <div class="switch-col">
-              <span class="cap">MEMORY</span>
+              <span class="cap">MEMORY STOP</span>
               <button class="toggle" id="memory" type="button" aria-pressed="false" aria-label="Memory stop">
                 <span class="lever"></span>
               </button>
@@ -107,10 +107,21 @@
             </div>
           </section>
 
+          <section class="playback-controls" aria-label="Playback position and volume">
+            <label class="seek-control" for="seek">
+              <span class="control-heading"><span>POSITION</span><output id="positionTime">00:00 / 00:00</output></span>
+              <input id="seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek through the current cassette side" disabled />
+            </label>
+            <label class="volume-control" for="volume">
+              <span class="control-heading"><span>VOLUME</span><output id="volumeValue">80%</output></span>
+              <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Playback volume" />
+            </label>
+          </section>
+
           <section class="keys" aria-label="Transport">
             <div class="rec-unit">
               <button class="rec-cover" id="recCover" type="button" aria-label="Open record cover"></button>
-              <button class="key rec" id="rec" type="button" disabled aria-label="Record">
+              <button class="key rec" id="rec" type="button" disabled aria-label="Record onto the inserted cassette">
                 <span class="face">REC</span>
                 <span class="ridges"></span>
               </button>
@@ -141,9 +152,9 @@
             <div class="speaker-slats"></div>
             <div class="mics">
               <span>MIC L</span>
-              <span class="xlr"></span>
+              <span class="mic-port"></span>
               <span>R</span>
-              <span class="xlr"></span>
+              <span class="mic-port"></span>
             </div>
           </footer>
 
@@ -153,15 +164,17 @@
         <aside class="tray" id="tray" hidden>
           <div class="tray-inner">
             <header>
-              <p>Cassette tray</p>
+              <p>Local tape library</p>
               <button type="button" id="closeTray">Close lid</button>
             </header>
+            <p class="hint" id="libraryStatus">Tapes are stored on this device only.</p>
             <ul id="tapeList"></ul>
+            <button class="new-blank" type="button" id="newBlank">Create blank cassette</button>
             <label class="insert">
-              Insert your own
-              <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.webm" />
+              Add audio or restore a tape backup
+              <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.webm,.zip,application/zip" />
             </label>
-            <p class="hint">Files stay on this device. Nothing is uploaded.</p>
+            <p class="hint">Export downloads a ZIP backup. Audio is kept in this browser and is never uploaded.</p>
           </div>
         </aside>
       </div>

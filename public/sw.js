@@ -1,4 +1,4 @@
-const CACHE = "throwback-player-v1";
+const CACHE = "throwback-player-v2";
 const BASE = self.registration.scope;
 
 self.addEventListener("install", (event) => {

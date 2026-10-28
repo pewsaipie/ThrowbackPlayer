@@ -107,7 +107,7 @@ function nightDesk(ch: Float32Array, sr: number): void {
   }
 }
 
-function quartzRun(ch: Float32Array, sr: number): void {
+function steadyRun(ch: Float32Array, sr: number): void {
   const bpm = 98;
   const beat = 60 / bpm;
   for (let b = 0; b < 12 * 4; b++) {
@@ -164,7 +164,7 @@ async function track(title: string, seconds: number, paint: (ch: Float32Array, s
 export async function makeDemoTape(): Promise<Tape> {
   const [a1, a2, b1, b2] = await Promise.all([
     track("Night Desk", 18, nightDesk),
-    track("Quartz Run", 16, quartzRun),
+    track("Steady Run", 16, steadyRun),
     track("Limiter Off", 18, limiterOff),
     track("Metal Tape", 16, metalTape),
   ]);
@@ -177,9 +177,9 @@ export async function makeDemoTape(): Promise<Tape> {
   };
 }
 
-export function makeBlank(): Tape {
+export function makeBlank(id = "blank-c60"): Tape {
   return {
-    id: "blank-c60",
+    id,
     title: "Blank C-60",
     kind: "blank",
     sideA: [],

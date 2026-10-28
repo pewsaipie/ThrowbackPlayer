@@ -1,8 +1,9 @@
 import { currentTape, currentTracks, patch, sideDuration, state, trackAt } from "../state";
-import { applyDeckTone, getContext, sourceInput, unlock, wowDepth } from "./audio";
+import { applyDeckTone, decode, getContext, sourceInput, unlock, wowDepth } from "./audio";
 import { startMotor, stopMotor, thunk } from "./sounds";
 
 let playing: AudioBufferSourceNode | null = null;
+let playRequest = 0;
 let startedAt = 0;
 let startedPos = 0;
 let rate = 1;
@@ -19,7 +20,7 @@ function connectSource(src: AudioBufferSourceNode): void {
   try {
     wow.connect(src.detune);
   } catch {
-    /* already */
+    /* already connected */
   }
   src.connect(sourceInput());
 }
@@ -36,24 +37,66 @@ function stopSource(): void {
   }
 }
 
-function syncPositionFromClock(): void {
-  if (!playing || (state.transport !== "play" && state.transport !== "rec")) return;
+function stopAtMemory(): void {
+  stopAll(true);
+  window.dispatchEvent(new Event("memory-stop"));
+}
+
+function syncPositionFromClock(): boolean {
+  if (!playing || (state.transport !== "play" && state.transport !== "rec")) return false;
   const elapsed = (getContext().currentTime - startedAt) * rate;
-  state.position = Math.min(sideDuration(), startedPos + elapsed);
+  const nextPosition = Math.min(sideDuration(), startedPos + elapsed);
+  if (
+    state.transport === "play" &&
+    state.memory &&
+    state.memoryAt > startedPos + 0.01 &&
+    nextPosition >= state.memoryAt
+  ) {
+    state.position = state.memoryAt;
+    stopAtMemory();
+    return true;
+  }
+  state.position = nextPosition;
+  return false;
 }
 
 export async function playFrom(position = state.position): Promise<void> {
-  await unlock();
+  const request = ++playRequest;
   stopSource();
-  const hit = trackAt(position);
+  stopMotor();
+  patch({ transport: "play", position });
+  await unlock();
+  if (request !== playRequest) return;
+
   const tape = currentTape();
-  if (!tape || tape.kind === "blank" || !hit || !hit.track.buffer) {
+  const side = state.side;
+  const hit = trackAt(position);
+  if (!tape || !hit) {
     patch({ transport: "stop" });
     return;
   }
+
+  let buffer = hit.track.buffer;
+  if (!buffer && hit.track.blob) {
+    try {
+      buffer = await decode(await hit.track.blob.arrayBuffer());
+    } catch {
+      if (request === playRequest) patch({ transport: "stop" });
+      return;
+    }
+    if (request !== playRequest) return;
+    const activeTrack = currentTracks()[hit.index];
+    if (currentTape()?.id !== tape.id || state.side !== side || activeTrack?.blob !== hit.track.blob) return;
+    activeTrack.buffer = buffer;
+  }
+  if (!buffer) {
+    if (request === playRequest) patch({ transport: "stop" });
+    return;
+  }
+
   const c = getContext();
   const src = c.createBufferSource();
-  src.buffer = hit.track.buffer;
+  src.buffer = buffer;
   rate = 1;
   src.playbackRate.value = 1;
   connectSource(src);
@@ -61,7 +104,9 @@ export async function playFrom(position = state.position): Promise<void> {
   startedPos = position;
   const remain = Math.max(0.05, hit.track.duration - hit.offset);
   src.onended = () => {
-    if (state.transport !== "play") return;
+    if (state.transport !== "play" || playing !== src) return;
+    syncPositionFromClock();
+    if (state.transport !== "play" || playing !== src) return;
     const nextPos = position - hit.offset + hit.track.duration + 0.01;
     if (nextPos >= sideDuration() - 0.05) {
       stopAll(true);
@@ -77,7 +122,8 @@ export async function playFrom(position = state.position): Promise<void> {
 }
 
 export function pause(): void {
-  syncPositionFromClock();
+  if (syncPositionFromClock()) return;
+  playRequest++;
   stopSource();
   patch({ transport: "pause" });
   applyDeckTone();
@@ -85,6 +131,7 @@ export function pause(): void {
 }
 
 export function stopAll(auto = false): void {
+  playRequest++;
   stopSource();
   stopMotor();
   if (auto) thunk();
@@ -93,9 +140,30 @@ export function stopAll(auto = false): void {
   updateMediaSession();
 }
 
+export async function seek(position: number): Promise<void> {
+  if (state.transport === "rec") return;
+  const wasPlaying = state.transport === "play";
+  if (wasPlaying) syncPositionFromClock();
+  const resume = wasPlaying && state.transport === "play";
+  const wasWinding = state.transport === "ff" || state.transport === "rew";
+  playRequest++;
+  stopSource();
+  stopMotor();
+  const target = Math.max(0, Math.min(sideDuration(), Number.isFinite(position) ? position : 0));
+  const transport = resume ? "pause" : wasWinding ? "stop" : state.transport;
+  patch({ position: target, transport });
+  if (resume) await playFrom(target);
+  else {
+    applyDeckTone();
+    updateMediaSession();
+  }
+}
+
 export async function wind(dir: "ff" | "rew"): Promise<void> {
+  if (state.transport === "rec") return;
   await unlock();
-  syncPositionFromClock();
+  if (syncPositionFromClock()) return;
+  playRequest++;
   stopSource();
   await startMotor(dir === "ff" ? 1.4 : 0.85);
   patch({ transport: dir });
@@ -105,22 +173,36 @@ export async function wind(dir: "ff" | "rew"): Promise<void> {
 export function tickWind(dt: number): void {
   const dur = sideDuration();
   if (dur <= 0) return;
+  const previous = state.position;
   const speed = 18; // seconds of tape per real second
-  let pos = state.position;
-  if (state.transport === "ff") pos += dt * speed;
-  if (state.transport === "rew") pos -= dt * speed;
-  if (pos <= 0) {
+  let position = previous;
+  if (state.transport === "ff") position += dt * speed;
+  if (state.transport === "rew") position -= dt * speed;
+
+  if (state.memory) {
+    const crossesMemory =
+      (state.transport === "ff" && state.memoryAt > previous && state.memoryAt <= position) ||
+      (state.transport === "rew" && state.memoryAt < previous && state.memoryAt >= position);
+    if (crossesMemory) {
+      state.position = state.memoryAt;
+      stopAtMemory();
+      return;
+    }
+  }
+
+  if (position <= 0) {
     state.position = 0;
     stopAll(true);
-  } else if (pos >= dur) {
+  } else if (position >= dur) {
     state.position = dur;
     stopAll(true);
   } else {
-    state.position = pos;
+    state.position = position;
   }
 }
 
 export function skip(dir: -1 | 1): void {
+  if (state.transport === "rec") return;
   const tracks = currentTracks();
   if (!tracks.length) return;
   syncPositionFromClock();
@@ -142,14 +224,16 @@ export function skip(dir: -1 | 1): void {
 }
 
 export function flipSide(): void {
+  if (state.transport === "rec") return;
   stopAll();
-  patch({ side: state.side === "A" ? "B" : "A", position: 0 });
+  patch({ side: state.side === "A" ? "B" : "A", position: 0, memory: false, memoryAt: 0 });
   updateMediaSession();
 }
 
 export function insertTape(id: string): void {
+  if (state.transport === "rec") return;
   stopAll();
-  patch({ currentTapeId: id, position: 0, side: "A", trayOpen: false });
+  patch({ currentTapeId: id, position: 0, side: "A", trayOpen: false, memory: false, memoryAt: 0 });
   updateMediaSession();
 }
 
@@ -172,8 +256,8 @@ function updateMediaSession(): void {
   const tape = currentTape();
   const hit = trackAt(state.position);
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: hit?.track.title ?? tape?.title ?? "Side B",
-    artist: tape?.title ?? "Side B",
+    title: hit?.track.title ?? tape?.title ?? `Side ${state.side}`,
+    artist: tape?.title ?? "Field recording",
     album: `Side ${state.side}`,
   });
   navigator.mediaSession.playbackState =

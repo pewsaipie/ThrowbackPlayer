@@ -1,7 +1,5 @@
 # NOTICE
 
-Side B is an original software instrument.
+Throwback Player is an original software and visual project with a generalized, retro-inspired portable audio interface. It is not affiliated with any hardware manufacturer or product line.
 
-It is inspired by 1980s portable cassette recorders, including the professional “Daddy” family of machines. It is **not** a Sony product, not a Walkman, and not affiliated with, endorsed by, or derived from Sony Group Corporation.
-
-Do not add the word “Walkman,” the Sony wordmark, or copied industrial-design trademarks to this project.
+The application uses original interface artwork, generated demo audio, and synthesized interface sounds. Third-party assets and their licenses are documented in `LICENSE-ASSETS.md`.
