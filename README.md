@@ -2,7 +2,8 @@
 
 A pocket studio cassette deck that plays your files.
 
-**Live:** [https://pewsaipie.github.io/ThrowbackPlayer/](https://pewsaipie.github.io/ThrowbackPlayer/)
+**Live:** [https://pewsaipie.github.io/ThrowbackPlayer/](https://pewsaipie.github.io/ThrowbackPlayer/)  
+(Until the GitHub repo is renamed, Pages will serve at [https://pewsaipie.github.io/trysomething-thenchange-name/](https://pewsaipie.github.io/trysomething-thenchange-name/).)
 
 Inspired by 1980s professional portable recorders (the WM-D6C family). Original chassis. Not affiliated with Sony.
 
