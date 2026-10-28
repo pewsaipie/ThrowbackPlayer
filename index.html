@@ -161,6 +161,12 @@
           <div class="sr-only" id="live" aria-live="polite"></div>
         </div>
 
+        <div class="update-banner" id="updateBanner" role="status" aria-live="polite" hidden>
+          <span>A new app version is ready</span>
+          <button type="button" id="updateApp">Update</button>
+          <button type="button" id="dismissUpdate" aria-label="Dismiss update notice">Later</button>
+        </div>
+
         <aside class="tray" id="tray" hidden>
           <div class="tray-inner">
             <header>
@@ -168,6 +174,7 @@
               <button type="button" id="closeTray">Close lid</button>
             </header>
             <p class="hint" id="libraryStatus">Tapes are stored on this device only.</p>
+            <button class="check-updates" type="button" id="checkUpdates">Check for app updates</button>
             <ul id="tapeList"></ul>
             <button class="new-blank" type="button" id="newBlank">Create blank cassette</button>
             <label class="insert">

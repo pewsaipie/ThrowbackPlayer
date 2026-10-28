@@ -1,13 +1,22 @@
-const CACHE = "throwback-player-v2";
+const CACHE = "throwback-player-v3";
+const LEGACY_CACHE = "throwback-player-v2";
 const BASE = self.registration.scope;
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "ACTIVATE_UPDATE") self.skipWaiting();
+});
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) =>
-      cache.addAll([BASE, `${BASE}index.html`, `${BASE}icon.svg`, `${BASE}manifest.webmanifest`]),
-    ),
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll([BASE, `${BASE}index.html`, `${BASE}icon.svg`, `${BASE}manifest.webmanifest`]))
+      .then(async () => {
+        const cacheNames = await caches.keys();
+        // The v2 app has no update prompt, so let this one-time migration take over automatically.
+        if (cacheNames.includes(LEGACY_CACHE)) await self.skipWaiting();
+      }),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

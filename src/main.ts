@@ -64,6 +64,16 @@ const positionTime = $<HTMLOutputElement>("positionTime");
 const volumeSlider = $<HTMLInputElement>("volume");
 const volumeValue = $<HTMLOutputElement>("volumeValue");
 const libraryStatus = $<HTMLParagraphElement>("libraryStatus");
+const updateBanner = $<HTMLDivElement>("updateBanner");
+const updateButton = $<HTMLButtonElement>("updateApp");
+const dismissUpdateButton = $<HTMLButtonElement>("dismissUpdate");
+const checkUpdatesButton = $<HTMLButtonElement>("checkUpdates");
+
+let appRegistration: ServiceWorkerRegistration | null = null;
+let observedRegistration: ServiceWorkerRegistration | null = null;
+let observedInstallingWorker: ServiceWorker | null = null;
+let waitingWorker: ServiceWorker | null = null;
+let applyingUpdate = false;
 
 const TYPES: TapeType[] = ["normal", "type2", "metal"];
 
@@ -77,6 +87,69 @@ function buzz(ms = 12): void {
 
 function announce(text: string): void {
   live.textContent = text;
+}
+
+function showReadyUpdate(registration: ServiceWorkerRegistration): void {
+  waitingWorker = registration.waiting;
+  updateBanner.hidden = !waitingWorker;
+  if (waitingWorker) announce("A new app version is ready to install");
+}
+
+function watchForAppUpdates(registration: ServiceWorkerRegistration): void {
+  appRegistration = registration;
+  showReadyUpdate(registration);
+  if (observedRegistration === registration) return;
+  observedRegistration = registration;
+  const observeInstallingWorker = () => {
+    const installing = registration.installing;
+    if (!installing || observedInstallingWorker === installing) return;
+    observedInstallingWorker = installing;
+    installing.addEventListener("statechange", () => {
+      if (installing.state === "installed" && registration.waiting) {
+        showReadyUpdate(registration);
+      }
+    });
+  };
+  registration.addEventListener("updatefound", observeInstallingWorker);
+  observeInstallingWorker();
+}
+
+async function checkForAppUpdates(): Promise<void> {
+  checkUpdatesButton.disabled = true;
+  const originalLabel = checkUpdatesButton.textContent;
+  checkUpdatesButton.textContent = "Checking…";
+  try {
+    if (!("serviceWorker" in navigator)) {
+      announce("App updates are not supported in this browser");
+      return;
+    }
+    const registration = appRegistration ?? await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      announce("App update service is not available yet");
+      return;
+    }
+    watchForAppUpdates(registration);
+    if (registration.waiting) {
+      showReadyUpdate(registration);
+      return;
+    }
+    await registration.update();
+    if (registration.waiting) {
+      showReadyUpdate(registration);
+    } else if (registration.installing) {
+      announce("Checking for app updates…");
+    } else {
+      updateBanner.hidden = true;
+      waitingWorker = null;
+      announce("The app is up to date");
+    }
+  } catch (error) {
+    console.warn("App update check failed", error);
+    announce("Could not check for app updates. Try again when online.");
+  } finally {
+    checkUpdatesButton.disabled = false;
+    checkUpdatesButton.textContent = originalLabel;
+  }
 }
 
 function formatTime(seconds: number): string {
@@ -394,6 +467,27 @@ $<HTMLButtonElement>("closeTray").addEventListener("click", async () => {
   patch({ trayOpen: false });
 });
 
+checkUpdatesButton.addEventListener("click", () => void checkForAppUpdates());
+updateButton.addEventListener("click", () => {
+  if (state.transport === "rec") {
+    announce("Finish recording before updating the app");
+    return;
+  }
+  const worker = appRegistration?.waiting ?? waitingWorker;
+  if (!worker) {
+    updateBanner.hidden = true;
+    announce("No app update is ready yet");
+    return;
+  }
+  applyingUpdate = true;
+  announce("Applying app update…");
+  worker.postMessage({ type: "ACTIVATE_UPDATE" });
+});
+dismissUpdateButton.addEventListener("click", () => {
+  updateBanner.hidden = true;
+  announce("Update postponed. Check again when you are ready.");
+});
+
 $<HTMLButtonElement>("newBlank").addEventListener("click", async () => {
   const tape = makeBlank(createTapeId("blank"));
   const saved = await saveToLocalLibrary(tape);
@@ -613,8 +707,14 @@ async function boot(): Promise<void> {
 }
 
 if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (applyingUpdate) window.location.reload();
+  });
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .then(watchForAppUpdates)
+      .catch((error: unknown) => console.warn("Service worker registration failed", error));
   });
 }
 

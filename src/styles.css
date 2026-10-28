@@ -555,6 +555,61 @@ body {
   padding: 22px 18px 28px;
 }
 
+.update-banner {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #8b6f35;
+  border-radius: 6px;
+  background: #241c11;
+  color: #f3dfad;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  font-size: 14px;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner span {
+  flex: 1;
+}
+
+.update-banner button,
+.check-updates {
+  flex: 0 0 auto;
+  background: #342b1b;
+  color: #f3dfad;
+  border: 1px solid #66542f;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font: 13px "Barlow Condensed", sans-serif;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.update-banner button:first-of-type {
+  background: #5b4520;
+}
+
+.update-banner button:disabled,
+.check-updates:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.check-updates {
+  width: 100%;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
 .tray header {
   display: flex;
   justify-content: space-between;
