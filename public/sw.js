@@ -1,5 +1,9 @@
-const CACHE = "throwback-player-v2";
+const CACHE = "throwback-player-v3";
 const BASE = self.registration.scope;
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "ACTIVATE_UPDATE") self.skipWaiting();
+});
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -7,7 +11,6 @@ self.addEventListener("install", (event) => {
       cache.addAll([BASE, `${BASE}index.html`, `${BASE}icon.svg`, `${BASE}manifest.webmanifest`]),
     ),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
