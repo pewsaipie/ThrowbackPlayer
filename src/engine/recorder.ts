@@ -1,83 +1,162 @@
-import { patch, state } from "../state";
+import { patch, state, type Side, type Tape, type Track } from "../state";
 import { attachMic, decode, detachMic, getContext } from "./audio";
-import { playFrom, stopAll } from "./transport";
+import { saveTape } from "./library";
 
-let rec: MediaRecorder | null = null;
+let recorder: MediaRecorder | null = null;
 let chunks: BlobPart[] = [];
-let recStarted = 0;
+let recordingStartedAt = 0;
+let targetTapeId: string | null = null;
+let targetSide: Side = "A";
+let recordingRequest = 0;
+let permissionPending = false;
+let finalizing = false;
+let finalization: Promise<boolean> | null = null;
 
-export async function startRecording(): Promise<boolean> {
+export async function startRecording(tapeId: string, side: Side): Promise<boolean> {
+  const tape = state.tapes.find((item) => item.id === tapeId);
+  if (!tape || (tape.kind !== "blank" && tape.kind !== "take")) {
+    patch({ status: "Insert a blank cassette to record" });
+    return false;
+  }
+  if (permissionPending || finalizing) return false;
+
+  const request = ++recordingRequest;
+  targetTapeId = tapeId;
+  targetSide = side;
+  permissionPending = true;
+  patch({ transport: "rec", status: "Requesting microphone" });
+
   try {
     const stream = await attachMic();
+    if (request !== recordingRequest) {
+      permissionPending = false;
+      detachMic();
+      return false;
+    }
+    permissionPending = false;
     chunks = [];
     const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
       ? "audio/webm;codecs=opus"
-      : "audio/webm";
-    rec = new MediaRecorder(stream, { mimeType: mime });
-    rec.ondataavailable = (e) => {
-      if (e.data.size) chunks.push(e.data);
+      : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "";
+    recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.push(event.data);
     };
-    rec.start(200);
-    recStarted = getContext().currentTime;
-    patch({ transport: "rec", status: "Recording" });
+    recorder.start(200);
+    recordingStartedAt = getContext().currentTime;
+    patch({ transport: "rec", status: "Recording to cassette" });
     return true;
   } catch {
-    detachMic();
-    patch({ status: "Mic blocked", recCoverOpen: true });
+    if (request === recordingRequest) {
+      permissionPending = false;
+      targetTapeId = null;
+      detachMic();
+      patch({ transport: "stop", status: "Microphone unavailable", recCoverOpen: true });
+    } else {
+      permissionPending = false;
+      detachMic();
+    }
     return false;
   }
 }
 
-export async function stopRecording(): Promise<void> {
-  const recorder = rec;
-  rec = null;
-  if (!recorder) {
-    detachMic();
-    stopAll();
-    return;
-  }
-  const blob = await new Promise<Blob>((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
-    if (recorder.state !== "inactive") recorder.stop();
-    else resolve(new Blob(chunks, { type: recorder.mimeType }));
+function extensionForMime(mimeType: string): string {
+  if (mimeType.includes("ogg")) return "ogg";
+  if (mimeType.includes("wav")) return "wav";
+  if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
+  return "webm";
+}
+
+function makeRecordedTape(tape: Tape, side: Side, track: Track): { tape: Tape; position: number } {
+  const existing = side === "A" ? tape.sideA : tape.sideB;
+  const position = existing.reduce((total, item) => total + item.duration, 0);
+  const title = tape.kind === "blank" && tape.title === "Blank C-60" ? "Recorded C-60" : tape.title;
+  const base = { ...tape, title, kind: "take" as const };
+  const updated = side === "A"
+    ? { ...base, sideA: [...tape.sideA, track] }
+    : { ...base, sideB: [...tape.sideB, track] };
+  return { tape: updated, position };
+}
+
+export function stopRecording(): Promise<boolean> {
+  if (finalization) return finalization;
+  finalization = finishRecording().finally(() => {
+    finalization = null;
   });
-  detachMic();
-  const dur = Math.max(0.2, getContext().currentTime - recStarted);
+  return finalization;
+}
+
+async function finishRecording(): Promise<boolean> {
+  const activeRecorder = recorder;
+  recorder = null;
+  const savedTapeId = targetTapeId;
+  const savedSide = targetSide;
+  targetTapeId = null;
+
+  if (!activeRecorder) {
+    if (permissionPending || state.transport === "rec") {
+      recordingRequest++;
+      detachMic();
+      patch({ transport: "stop", recCoverOpen: false, status: "Recording cancelled" });
+    }
+    return false;
+  }
+
+  finalizing = true;
+  patch({ recCoverOpen: false, status: "Saving recording" });
   try {
-    const buf = await decode(await blob.arrayBuffer());
-    const takeNum = state.tapes.filter((t) => t.kind === "take").length + 1;
-    const title = `Take ${takeNum}`;
-    const id = `take-${Date.now()}`;
-    const tape = {
-      id,
+    const blob = await new Promise<Blob>((resolve) => {
+      activeRecorder.onstop = () => resolve(new Blob(chunks, { type: activeRecorder.mimeType || "audio/webm" }));
+      if (activeRecorder.state !== "inactive") activeRecorder.stop();
+      else resolve(new Blob(chunks, { type: activeRecorder.mimeType || "audio/webm" }));
+    });
+    detachMic();
+
+    const target = state.tapes.find((tape) => tape.id === savedTapeId);
+    if (!target) {
+      patch({ status: "Recording cancelled" });
+      return false;
+    }
+
+    const fallbackDuration = Math.max(0.2, getContext().currentTime - recordingStartedAt);
+    let buffer: AudioBuffer | null = null;
+    try {
+      buffer = await decode(await blob.arrayBuffer());
+    } catch {
+      // Preserve the original recording so it can still be exported if decoding is unavailable.
+    }
+    const tracks = savedSide === "A" ? target.sideA : target.sideB;
+    const trackNumber = tracks.length + 1;
+    const title = `Take ${trackNumber}`;
+    const extension = extensionForMime(blob.type);
+    const track: Track = {
       title,
-      kind: "take" as const,
-      sideA: [{ title, duration: buf.duration || dur, buffer: buf }],
-      sideB: [],
+      duration: buffer?.duration || fallbackDuration,
+      buffer,
+      blob,
+      fileName: `${title.toLowerCase().replace(/\s+/g, "-")}.${extension}`,
+      mimeType: blob.type || "audio/webm",
     };
+    const { tape, position } = makeRecordedTape(target, savedSide, track);
     patch({
-      tapes: [...state.tapes, tape],
-      currentTapeId: id,
-      position: 0,
-      side: "A",
+      tapes: state.tapes.map((item) => item.id === tape.id ? tape : item),
+      currentTapeId: tape.id,
+      side: savedSide,
+      position,
       transport: "stop",
       recCoverOpen: false,
       status: title,
     });
-  } catch {
-    patch({ transport: "stop", status: "Take failed", recCoverOpen: false });
-  }
-}
 
-export async function togglePlay(): Promise<void> {
-  if (state.transport === "rec") {
-    await stopRecording();
-    return;
-  }
-  if (state.transport === "play") {
-    const { pause } = await import("./transport");
-    pause();
-  } else {
-    await playFrom(state.position);
+    try {
+      await saveTape(tape);
+      return true;
+    } catch {
+      return false;
+    }
+  } finally {
+    finalizing = false;
   }
 }

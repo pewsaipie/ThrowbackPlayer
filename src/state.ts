@@ -1,11 +1,14 @@
 export type Transport = "stop" | "play" | "pause" | "ff" | "rew" | "rec";
-export type TapeType = "normal" | "cro2" | "metal";
+export type TapeType = "normal" | "type2" | "metal";
 export type Side = "A" | "B";
 
 export interface Track {
   title: string;
   duration: number;
   buffer: AudioBuffer | null;
+  blob?: Blob;
+  fileName?: string;
+  mimeType?: string;
 }
 
 export interface Tape {
@@ -21,13 +24,14 @@ export interface DeckState {
   transport: Transport;
   trayOpen: boolean;
   recCoverOpen: boolean;
-  dolby: boolean;
+  hissReduction: boolean;
   tapeType: TapeType;
   limiter: boolean;
-  quartz: boolean;
+  speedStable: boolean;
   light: boolean;
   memory: boolean;
   memoryAt: number;
+  volume: number;
   /** Seconds into the current side. */
   position: number;
   side: Side;
@@ -45,19 +49,20 @@ export const state: DeckState = {
   transport: "stop",
   trayOpen: false,
   recCoverOpen: false,
-  dolby: false,
+  hissReduction: false,
   tapeType: "normal",
   limiter: false,
-  quartz: true,
+  speedStable: true,
   light: true,
   memory: false,
   memoryAt: 0,
+  volume: 0.8,
   position: 0,
   side: "A",
   currentTapeId: null,
   tapes: [],
   ready: false,
-  status: "Threading tape…",
+  status: "Winding tape…",
 };
 
 export function subscribe(fn: Listener): () => void {

@@ -4,7 +4,7 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let limiter: DynamicsCompressorNode | null = null;
 let tapeEq: BiquadFilterNode | null = null;
-let dolby: BiquadFilterNode | null = null;
+let hissFilter: BiquadFilterNode | null = null;
 let analyser: AnalyserNode | null = null;
 let hissGain: GainNode | null = null;
 let wow: OscillatorNode | null = null;
@@ -37,10 +37,10 @@ function buildGraph(c: AudioContext): void {
   tapeEq.frequency.value = 6000;
   tapeEq.gain.value = -2;
 
-  dolby = c.createBiquadFilter();
-  dolby.type = "highshelf";
-  dolby.frequency.value = 8000;
-  dolby.gain.value = 0;
+  hissFilter = c.createBiquadFilter();
+  hissFilter.type = "highshelf";
+  hissFilter.frequency.value = 7800;
+  hissFilter.gain.value = 0;
 
   limiter = c.createDynamicsCompressor();
   limiter.threshold.value = 0;
@@ -54,7 +54,7 @@ function buildGraph(c: AudioContext): void {
   analyser.smoothingTimeConstant = 0.35;
 
   master = c.createGain();
-  master.gain.value = 0.9;
+  master.gain.value = state.volume * 0.9;
 
   hissGain = c.createGain();
   hissGain.gain.value = 0.018;
@@ -70,8 +70,8 @@ function buildGraph(c: AudioContext): void {
   wow.connect(wowGain);
 
   sourceOut.connect(tapeEq);
-  tapeEq.connect(dolby);
-  dolby.connect(limiter);
+  tapeEq.connect(hissFilter);
+  hissFilter.connect(limiter);
   limiter.connect(analyser);
   analyser.connect(master);
   hissGain.connect(master);
@@ -113,16 +113,17 @@ export function wowDepth(): GainNode {
 }
 
 export function applyDeckTone(): void {
-  if (!tapeEq || !dolby || !limiter || !hissGain) return;
+  if (!tapeEq || !hissFilter || !limiter || !hissGain || !master) return;
 
-  const eq = { normal: -5, cro2: -1.5, metal: 3 }[state.tapeType];
+  const eq = { normal: -5, type2: -1.5, metal: 3 }[state.tapeType];
   tapeEq.gain.value = eq;
+  hissFilter.gain.value = state.hissReduction ? -5 : 0;
 
-  dolby.gain.value = state.dolby ? -8 : 0;
-  const hiss = state.dolby ? 0.006 : 0.02;
+  const hiss = state.hissReduction ? 0.006 : 0.02;
   const ducked =
     state.transport === "play" || state.transport === "rec" ? hiss * 0.45 : hiss;
-  hissGain.gain.setTargetAtTime(state.transport === "stop" ? hissed(0.012) : ducked, getContext().currentTime, 0.08);
+  const idleHiss = state.hissReduction ? 0.0042 : 0.012;
+  hissGain.gain.setTargetAtTime(state.transport === "stop" ? idleHiss : ducked, getContext().currentTime, 0.08);
 
   if (state.limiter) {
     limiter.threshold.value = -18;
@@ -134,11 +135,8 @@ export function applyDeckTone(): void {
     limiter.knee.value = 0;
   }
 
-  wowGain!.gain.value = state.quartz ? 0 : 7;
-}
-
-function hissed(v: number): number {
-  return state.dolby ? v * 0.35 : v;
+  master.gain.setTargetAtTime(Math.max(0, Math.min(1, state.volume)) * 0.9, getContext().currentTime, 0.025);
+  wowGain!.gain.value = state.speedStable ? 0 : 7;
 }
 
 export function vuLevels(): { l: number; r: number } {

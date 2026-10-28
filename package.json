@@ -17,6 +17,7 @@
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.2.5",
     "@fontsource/caveat": "^5.2.5",
-    "@fontsource/share-tech-mono": "^5.2.5"
+    "@fontsource/share-tech-mono": "^5.2.5",
+    "fflate": "^0.8.3"
   }
 }
